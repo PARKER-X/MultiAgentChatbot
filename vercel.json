@@ -1,25 +1,13 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "app.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxDuration": 10
-      }
-    },
-    {
-      "src": "static/**/*",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
     {
       "src": "/(.*)",
       "dest": "app.py"
     }
-  ],
-  "env": {
-    "GOOGLE_API_KEY": "@google_api_key"
-  }
+  ]
 }

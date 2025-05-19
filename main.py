@@ -6,7 +6,7 @@ from langgraph.graph.message import add_messages
 from langchain.chat_models import init_chat_model
 from pydantic import BaseModel,Field
 from typing_extensions import TypedDict
-
+# from api import GOOGLE_API_KEY
 
 load_dotenv()
 
@@ -108,25 +108,79 @@ graph_builder.add_edge("logical",END)
 graph = graph_builder.compile()
 
 
-def run_chatbot():
-    state = {"messages": [], "message_type": None}
+# def run_chatbot():
+#     state = {"messages": [], "message_type": None}
 
-    while True:
-        user_input = input("Message: ")
-        if user_input == "exit":
-            print("Bye")
-            break
+#     while True:
+#         user_input = input("Message: ")
+#         if user_input == "exit":
+#             print("Bye")
+#             break
 
-        state["messages"] = state.get("messages", []) + [
-            {"role": "user", "content": user_input}
-        ]
+#         state["messages"] = state.get("messages", []) + [
+#             {"role": "user", "content": user_input}
+#         ]
 
-        state = graph.invoke(state)
+#         state = graph.invoke(state)
 
-        if state.get("messages") and len(state["messages"]) > 0:
-            last_message = state["messages"][-1]
-            print(f"Assistant: {last_message.content}")
+#         if state.get("messages") and len(state["messages"]) > 0:
+#             last_message = state["messages"][-1]
+#             print(f"Assistant: {last_message.content}")
+
+from langchain.schema import HumanMessage, AIMessage
+
+def format_message(msg):
+    """Convert LangChain message objects to plain JSON-serializable dicts."""
+    if isinstance(msg, HumanMessage):
+        return {"role": "user", "content": msg.content}
+    elif isinstance(msg, AIMessage):
+        return {"role": "assistant", "content": msg.content}
+    elif isinstance(msg, dict):
+        return msg  # already plain
+    return {"role": "unknown", "content": str(msg)}
+
+def run_chatbot(user_input: str, previous_messages=None) -> dict:
+    if previous_messages is None:
+        previous_messages = []
+
+    # Convert previous messages back into LangChain message objects
+    messages = []
+    for m in previous_messages:
+        if m["role"] == "user":
+            messages.append(HumanMessage(content=m["content"]))
+        elif m["role"] == "assistant":
+            messages.append(AIMessage(content=m["content"]))
+        else:
+            continue  # Skip unknown roles
+
+    # Add the new user message
+    messages.append(HumanMessage(content=user_input))
+
+    # Build state for LangGraph
+    state = {
+        "messages": messages,
+        "message_type": None
+    }
+
+    # Run the graph
+    state = graph.invoke(state)
+
+    # Format all messages for the frontend (convert to plain dicts)
+    plain_history = [format_message(m) for m in state["messages"]]
+
+    # Find the assistant's response
+    for msg in reversed(state["messages"]):
+        if isinstance(msg, AIMessage):
+            return {
+                "response": msg.content,
+                "state": plain_history
+            }
+
+    return {
+        "response": "Sorry, no response generated.",
+        "state": plain_history
+    }
 
 
-if __name__ == "__main__":
-    run_chatbot()
+# if __name__ == "__main__":
+#     run_chatbot()
